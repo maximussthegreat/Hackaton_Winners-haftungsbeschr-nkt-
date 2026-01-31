@@ -12,7 +12,7 @@ interface SystemConsoleProps {
     ships: any[];
     tideLevel?: number;
     tideVerified?: string;
-    trafficData: { incidents: string[], verified_at: string };
+    trafficData: { incidents: string[], verified_at: string, density?: number };
 }
 
 export default function SystemConsole({
@@ -29,7 +29,10 @@ export default function SystemConsole({
     // We expect the parent (page.tsx) to pass all relevant real-time data from the Brain.
 
     // Derived state for display
-    const currentAlert = riskGrade === 'CRITICAL' ? 'BRIDGE OPEN' : null;
+    // Check for Sim Gridlock (Density 100) or Critical Risk
+    // @ts-ignore
+    const isSimGridlock = trafficData?.density >= 100;
+    const currentAlert = riskGrade === 'CRITICAL' || isSimGridlock ? 'BRIDGE OPEN' : null;
     const currentRisk = riskGrade === 'CRITICAL' ? 0.8 : (riskGrade === 'MODERATE' ? 0.5 : 0.0);
 
 
@@ -49,11 +52,11 @@ export default function SystemConsole({
 
 
     return (
-        <div className="flex h-screen w-screen bg-black text-green-500 font-mono overflow-hidden relative">
+        <div className="flex h-screen w-screen bg-transparent text-green-500 font-mono overflow-hidden relative pointer-events-none">
 
 
             {/* FOREGROUND LAYER: CONSOLE UI - NOW LARGER & GRADED */}
-            <div className={`absolute bottom-6 left-6 z-10 bg-black/90 border-2 p-6 rounded-xl font-mono text-sm w-[40rem] backdrop-blur-md transition-all duration-500 ${riskColorClass}`}>
+            <div className={`absolute bottom-6 left-6 z-10 bg-black/90 border-2 p-6 rounded-xl font-mono text-sm w-[40rem] backdrop-blur-md transition-all duration-500 pointer-events-auto ${riskColorClass}`}>
 
                 {/* HEADER */}
                 <h3 className={`mb-4 border-b pb-2 flex justify-between items-center text-lg font-bold tracking-widest ${riskGrade === 'CRITICAL' ? 'text-red-500 animate-pulse' : 'text-cyan-400'}`}>
@@ -66,8 +69,20 @@ export default function SystemConsole({
                 {/* AI STRATEGIC INSIGHT BOX (New) */}
                 <div className="mb-4 bg-gray-900/50 p-3 rounded border border-white/10">
                     <div className="text-xs text-gray-500 mb-1">AI STRATEGIC ASSESSMENT (GPT-4o)</div>
-                    <div className="text-white italic typing-effect">
-                        "{aiThought || "Establishing Neural Link..."}"
+                    <div className="text-white italic typing-effect h-auto min-h-[1.5em]">
+                        {aiThought ? (
+                            (() => {
+                                const thought = aiThought.toUpperCase();
+                                let colorClass = "text-cyan-200";
+                                if (thought.includes("CRITICAL") || thought.includes("GRIDLOCK") || riskGrade === "CRITICAL") colorClass = "text-red-400 animate-pulse font-bold";
+                                else if (thought.includes("WARNING") || thought.includes("DELAY")) colorClass = "text-yellow-300";
+                                else if (thought.includes("OPTIMIZED") || thought.includes("SAFE")) colorClass = "text-green-400";
+
+                                return <span className={colorClass}>"{aiThought}"</span>;
+                            })()
+                        ) : (
+                            <span className="text-gray-600 opacity-50">"Establishing Neural Link..."</span>
+                        )}
                     </div>
                 </div>
 

@@ -45,6 +45,15 @@ export default function Home() {
   const [historyData, setHistoryData] = useState<any>(null);
   const [sliderValue, setSliderValue] = useState(100); // 0 to 100%
   const [playbackShips, setPlaybackShips] = useState<Ship[]>([]);
+
+  // Simulation Context (History Playback)
+  const [simBridgeStatus, setSimBridgeStatus] = useState<any>({ RETHE: "CLOSED", KATTWYK: "CLOSED" });
+  const [simTrafficDensity, setSimTrafficDensity] = useState<number>(0);
+  const [simWeather, setSimWeather] = useState<string>("CLEAR");
+  const [simObstacles, setSimObstacles] = useState<string[]>([]);
+
+  const [showRadar, setShowRadar] = useState<boolean>(true); // Radar Toggle
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeLabel, setCurrentTimeLabel] = useState("LIVE");
   const [tideLevel, setTideLevel] = useState(0);
@@ -56,7 +65,16 @@ export default function Home() {
 
     const interval = setInterval(() => {
       setSliderValue(prev => {
-        const next = prev + 0.5; // Advance 0.5% every 200ms = 40s for full playback
+        // Dynamic Speed: Base 2x slower (0.25). 
+        // Matrix Mode: 10x slower (0.02) if Bridge is opening/open to emphasize the event.
+        let increment = 0.25;
+        const isBridgeActive = simBridgeStatus?.RETHE === "OPEN" || simBridgeStatus?.KATTWYK === "OPEN";
+
+        if (isBridgeActive) {
+          increment = 0.02; // "Matrix Bullet Time" for bridge events
+        }
+
+        const next = prev + increment;
         if (next >= 100) {
           setIsPlaying(false);
           return 100;
@@ -66,7 +84,7 @@ export default function Home() {
     }, 200);
 
     return () => clearInterval(interval);
-  }, [isPlaying, sliderValue]);
+  }, [isPlaying, sliderValue, simBridgeStatus]); // Added simBridgeStatus dep
 
   // Notify AI during playback (every 5 slider steps)
   useEffect(() => {
@@ -130,13 +148,14 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [alert, historyData]);
 
-  // Effect: Calculate ships based on Slider
+  // Effect: Calculate ships and environment based on Slider
   useEffect(() => {
     if (!historyData) return;
 
     // If Slider is Max, use REALTIME state
     if (sliderValue >= 100) {
       setPlaybackShips(state.visual_truth?.ships || []);
+      // Reset Bridge/Traffic to Realtime
       return;
     }
 
@@ -145,46 +164,105 @@ export default function Home() {
     const end = historyData.window_end;
     const targetTime = start + ((end - start) * (sliderValue / 100));
 
+    // 1. Compute Ships
     const currentFrameShips: Ship[] = [];
-
     historyData.ships.forEach((hShip: any) => {
-      // Find closest path point
-      // Path is sorted by ts (mostly)
-      // Simple linear search for now (optimization: binary search)
       const path = hShip.path;
       if (!path || path.length < 2) return;
-
-      // If before start or after end of path, skip
       if (targetTime < path[0].ts || targetTime > path[path.length - 1].ts) return;
 
       for (let i = 0; i < path.length - 1; i++) {
-        if (targetTime >= path[i].ts && targetTime <= path[i + 1].ts) {
-          // Interpolate
-          const factor = (targetTime - path[i].ts) / (path[i + 1].ts - path[i].ts);
-          const lat = path[i].lat + (path[i + 1].lat - path[i].lat) * factor;
-          const lng = path[i].lng + (path[i + 1].lng - path[i].lng) * factor;
-
+        const p1 = path[i];
+        const p2 = path[i + 1];
+        if (targetTime >= p1.ts && targetTime <= p2.ts) {
+          const ratio = (targetTime - p1.ts) / (p2.ts - p1.ts);
           currentFrameShips.push({
             id: hShip.id,
-            lat,
-            lng,
             type: hShip.type,
-            imo: hShip.imo,
-            mmsi: hShip.mmsi,
-            status: path[i].status || "UNDERWAY"
+            lat: p1.lat + (p2.lat - p1.lat) * ratio,
+            lng: p1.lng + (p2.lng - p1.lng) * ratio,
+            status: p1.status
           });
           break;
         }
       }
     });
-
     setPlaybackShips(currentFrameShips);
 
-  }, [sliderValue, historyData, state.visual_truth]);
+    // 2. Compute Environment (Timeline)
+    if (historyData.timeline) {
+      // Find closest timeline snapshot
+      // Optimized: Assuming sorted, could allow slight mismatch
+      const snapshot = historyData.timeline.reduce((prev: any, curr: any) =>
+        Math.abs(curr.ts - targetTime) < Math.abs(prev.ts - targetTime) ? curr : prev
+      );
 
+      if (snapshot) {
+        setSimBridgeStatus(snapshot.bridges);
+        setSimTrafficDensity(snapshot.traffic_density);
+        setSimWeather(snapshot.weather);
+        setSimObstacles(snapshot.obstacles);
+      }
+    }
+
+  }, [sliderValue, historyData, state]); // Added state dependency
+
+  // Determine Data Source for UI
+  const isHistory = sliderValue < 100;
+
+  // Traffic Simulation Logic (Visuals)
+  let simIncidents: string[] = [];
+  if (isHistory) {
+    if (simObstacles && simObstacles.length > 0) {
+      simIncidents = simObstacles;
+    } else {
+      if (simTrafficDensity > 80) simIncidents = ["⛔ GRIDLOCK DETECTED: A7 ELBTUNNEL", "⚠️ TRAFFIC JAM: KÖHLBRANDBRÜCKE"];
+      else if (simTrafficDensity > 50) simIncidents = ["⚠️ SLOW TRAFFIC: HAFEN CITY", "🚛 HEAVY TRUCK LOAD"];
+    }
+  }
+
+  // Weather Overlay JSX
+  // Weather Radar Overlay (CSS Parallax Clouds)
+  // Mimics DWD "RX-Produkt" Composite Radar
+  const weatherRadarOverlay = (
+    <div className={`absolute inset-0 pointer-events-none z-30 transition-opacity duration-700 ${showRadar ? 'opacity-100' : 'opacity-0'}`}>
+      {/* Layer 1: Slow High Altitude Clouds */}
+      <div className="absolute inset-0 w-[200%] h-[200%] opacity-30 mix-blend-color-dodge"
+        style={{
+          background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%)',
+          backgroundSize: '400px 400px',
+          animation: 'drift 60s linear infinite'
+        }} />
+
+      {/* Layer 2: Precipitation Activity (Radar Echoes) */}
+      {(simWeather === "SNOW" || simWeather === "FOG") && (
+        <div className="absolute inset-0 w-[200%] h-[200%] opacity-20 mix-blend-screen"
+          style={{
+            background: 'radial-gradient(circle, rgba(200,200,255,0.2) 0%, transparent 50%)',
+            backgroundSize: '250px 250px',
+            animation: 'drift 30s linear infinite reverse',
+            filter: 'blur(20px)'
+          }} />
+      )}
+
+      {/* CSS Keyframes injected here for simplicity */}
+      <style jsx global>{`
+            @keyframes drift {
+                0% { transform: translate(0, 0); }
+                100% { transform: translate(-50%, -50%); }
+            }
+        `}</style>
+    </div>
+  );
+
+  const activeShips = isHistory ? playbackShips : (state.visual_truth?.ships || []);
+  // Use Sim State if History, otherwise "OPEN" (default) or Real (if we had sensors)
+  // For LIVE, assume Bridges Closed unless we have live data? Default to Closed.
+  const activeBridgeStatus = isHistory ? (simBridgeStatus?.RETHE === "OPEN" || simBridgeStatus?.KATTWYK === "OPEN" ? "bridge_open" : "bridge_closed") : "bridge_closed";
 
   return (
-    <main className="flex min-h-screen flex-col bg-black text-white relative overflow-hidden">
+    <main className="relative w-screen h-screen bg-black overflow-hidden select-none">
+      {isHistory && weatherRadarOverlay}
 
       {/* HUD Layer */}
       <div className="absolute top-0 left-0 w-full z-10 p-6 pointer-events-none flex justify-between items-start">
@@ -212,8 +290,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* System Console - Bottom Left */}
-      <div className="absolute bottom-6 left-6 z-20 pointer-events-auto">
+      {/* System Console - Full Screen Overlay */}
+      <div className="absolute inset-0 z-20 pointer-events-none">
         {/* @ts-ignore */}
         <SystemConsole
           logs={state.system_logs || []}
@@ -223,8 +301,9 @@ export default function Home() {
           ships={playbackShips.length > 0 ? playbackShips : (state.visual_truth?.ships || [])}
           tideLevel={state.visual_truth?.tide}
           trafficData={{
-            incidents: state.visual_truth?.traffic_alerts || [],
-            verified_at: "LIVE"
+            incidents: isHistory ? simIncidents : (state.visual_truth?.traffic_alerts || []),
+            verified_at: isHistory ? "SIMULATION" : "LIVE",
+            density: isHistory ? simTrafficDensity : 0
           }}
         />
       </div>
@@ -242,6 +321,15 @@ export default function Home() {
               title="Toggle TomTom Traffic Overlay"
             >
               🚗 {showTraffic ? "ON" : "OFF"}
+            </button>
+
+            {/* Radar Toggle Button */}
+            <button
+              onClick={() => setShowRadar(!showRadar)}
+              className={`ml-2 px-2 py-1 rounded text-xs font-mono transition-all ${showRadar ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+              title="Toggle DWD Weather Radar"
+            >
+              ☁️ {showRadar ? "ON" : "OFF"}
             </button>
           </div>
           <span className={`px-2 py-1 rounded text-xs font-mono ${sliderValue >= 100 ? 'bg-red-600 text-white' : 'bg-cyan-900 text-cyan-300'}`}>
@@ -321,7 +409,7 @@ export default function Home() {
           trucks={state.visual_truth?.trucks || []}
           ships={playbackShips.length > 0 ? playbackShips : (state.visual_truth?.ships || [])}
           bridgeStatus={state.visual_truth?.trucks && state.visual_truth.trucks.length > 0 ? "bridge_open" : "bridge_closed"}
-          showTraffic={showTraffic}
+          showTraffic={showTraffic && !isHistory}
         />
       </div>
 

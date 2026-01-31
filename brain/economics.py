@@ -1,11 +1,31 @@
 class EconomicsEngine:
     def __init__(self):
-        self.diesel_price_eur = 1.75
-        self.co2_per_liter = 2.64
+        # --- EXTERNAL DATA SOURCE CONFIGURATION ---
+        # Real-time fuel prices should be fetched from BunkerEx or Ship&Bunker API
+        # API_ENDPOINT = "https://api.bunkerex.com/v1/prices"
+        # API_KEY = os.getenv("BUNKER_API_KEY")
+        
+        self.market_data = self._fetch_live_market_data()
+        
+        self.diesel_price_eur = self.market_data["diesel_mgo_eur"]
+        self.co2_per_liter = 2.64 # Constant physics
         self.idling_consumption_lph = 3.0
+        
         # New: Megamax Economics (from Jan 2026 Report)
-        self.megamax_hourly_charter_rate = 5000.0 # Approx cost of delay per hour for 20k TEU
-        self.dredging_op_cost_daily = 35000.0 # Cost of keeping channel open
+        self.megamax_hourly_charter_rate = 5000.0 
+        self.dredging_op_cost_daily = 35000.0 
+
+    def _fetch_live_market_data(self):
+        """
+        Simulates fetching live market data from Energy Exchanges (EEX/BunkerEx).
+        In Simulation Mode (No API Key), returns pegged Jan 2026 values.
+        """
+        # [SIMULATION STUB]: In production, replace with httpx.get(API_ENDPOINT)
+        return {
+            "diesel_mgo_eur": 1.75, # Pegged MGO Price Hamburg
+            "lng_eur_kwh": 0.08,    # LNG Spot Price
+            "eua_carbon_price": 85.0 # EUR/ton CO2
+        }
 
     def calculate_savings(self, trucks_rerouted: int, time_saved_hours: float):
         fuel_saved_liters = trucks_rerouted * time_saved_hours * self.idling_consumption_lph

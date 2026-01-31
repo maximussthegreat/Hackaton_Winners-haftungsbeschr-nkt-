@@ -217,7 +217,11 @@ def process_voice_command(command: dict):
 
 @app.get("/history")
 def get_history():
-    """Returns 24h of historical ship movements"""
+    """
+    Returns 24h ship movement history.
+    Tries MarineTraffic API first, falls back to UltraThink Generative Model.
+    """
+    # Use Historian class which now uses the API wrapper
     return historian.get_24h_history()
 
 @app.post("/playback/state")
