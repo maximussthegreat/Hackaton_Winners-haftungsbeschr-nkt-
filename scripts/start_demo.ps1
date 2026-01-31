@@ -1,30 +1,37 @@
-$ErrorActionPreference = "SilentlyContinue"
+$projectRoot = "C:\Users\maxim\HackatonJanuary"
+$logDir = "$projectRoot\logs"
 
-# Get the absolute path of the project root (Parent of the scripts folder)
-$ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent $ScriptPath
+# Ensure log directory exists
+if (-not (Test-Path $logDir)) {
+    New-Item -ItemType Directory -Path $logDir | Out-Null
+}
 
 Write-Host "Starting SENTINEL: The All-Seeing Port Brain..." -ForegroundColor Cyan
-Write-Host "Project Root: $ProjectRoot" -ForegroundColor Gray
+Write-Host "Project Root: $projectRoot"
+Write-Host "Logs are being written to $logDir" -ForegroundColor Yellow
 
-# 1. Start The Brain (Port 8002) - Explicit CWD
-Write-Host "Launching BRAIN (Cognition Layer) on Port 8002..." -ForegroundColor Green
-Start-Process -FilePath "powershell" -ArgumentList "-NoExit", "-Command", "cd '$ProjectRoot'; .\venv\Scripts\Activate; uvicorn brain.main:app --reload --port 8002"
+# 3. Install Dependencies (The "Triple Check")
+Write-Host "Installing Dependencies..." -ForegroundColor Cyan
+pip install -r requirements.txt
 
-# 2. Start The Eye (Port 8001) - Explicit CWD
-Write-Host "Launching EYE (Perception Layer) on Port 8001..." -ForegroundColor Green
-Start-Process -FilePath "powershell" -ArgumentList "-NoExit", "-Command", "cd '$ProjectRoot'; .\venv\Scripts\Activate; uvicorn eye.main:app --reload --port 8001"
+# Kill existing processes (simple cleanup)
+Get-Process -Name "uvicorn" -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name "next" -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name "node" -ErrorAction SilentlyContinue | Stop-Process -Force # Be careful with this on shared machines
 
-# 3. Start The Twin (Port 3000)
-Write-Host "Launching TWIN (Interaction Layer) on Port 3000..." -ForegroundColor Green
-Start-Process -FilePath "powershell" -ArgumentList "-NoExit", "-Command", "cd '$ProjectRoot\twin'; npm run dev"
+# Start BRAIN (Visible Window, Persistent)
+Write-Host "Launching BRAIN (Cognition Layer) on Port 8002..."
+Start-Process "cmd" "/k call venv\Scripts\activate && python -m uvicorn brain.main:app --reload --port 8002 --host 127.0.0.1" -WorkingDirectory "$projectRoot"
 
-Write-Host "System Online. Waiting for services..."
-Start-Sleep -Seconds 5
-Start-Process "http://localhost:3000"
+# Start EYE (Visible Window, Persistent)
+Write-Host "Launching EYE (Perception Layer) on Port 8001..."
+Start-Process "cmd" "/k call venv\Scripts\activate && python -m uvicorn eye.main:app --reload --port 8001 --host 127.0.0.1" -WorkingDirectory "$projectRoot"
 
-Write-Host "---------------------------------------------------"
-Write-Host "DEMO COMMANDS:"
-Write-Host "To trigger the anomaly manually (if voice fails):"
-Write-Host "Invoke-RestMethod -Method Post -Uri 'http://localhost:8002/simulate/sensor_failure'"
-Write-Host "---------------------------------------------------"
+# Start TWIN (Visible Window, Persistent)
+Write-Host "Launching TWIN (Interaction Layer) on Port 3000..."
+Start-Process "cmd" "/k npm run dev" -WorkingDirectory "$projectRoot\twin"
+
+Write-Host "System Launching in 3 external windows..." -ForegroundColor Cyan
+
+Write-Host "System Online. Check logs for details." -ForegroundColor Cyan
+Write-Host "Run .\scripts\show_logs.ps1 to see errors." -ForegroundColor Yellow

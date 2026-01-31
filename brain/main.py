@@ -1,5 +1,6 @@
 import asyncio
 import httpx
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
@@ -35,13 +36,19 @@ current_state = {
     "system_logs": []
 }
 
+
+# ...
+
 async def poll_eyes():
     """Background task to fetch visual truth from The Eye"""
+async def poll_eyes():
+    """Background task to fetch visual truth from The Eye"""
+    # logger.info(f"CONNECTING TO EYE AT: {eye_url}")
     async with httpx.AsyncClient() as client:
         while True:
             try:
                 # Poll The Eye
-                resp = await client.get("http://localhost:8001/status?node_id=rethe")
+                resp = await client.get("http://127.0.0.1:8001/status?node_id=rethe")
                 if resp.status_code == 200:
                     data = resp.json()
                     current_state["visual_truth"] = data
