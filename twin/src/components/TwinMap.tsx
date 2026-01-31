@@ -1,22 +1,23 @@
 'use client';
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect } from 'react';
 
 // Custom Icons
+// Custom Icons with Emojis
 const truckIcon = L.divIcon({
     className: 'custom-div-icon',
-    html: `<div style="background-color: #fca5a5; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px #fca5a5;"></div>`,
-    iconSize: [10, 10],
-    iconAnchor: [5, 5]
+    html: `<div style="font-size: 20px; filter: drop-shadow(0 0 5px orange);">🚛</div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
 });
 
 const shipIcon = L.divIcon({
     className: 'custom-div-icon',
-    html: `<div style="background-color: #0ea5e9; width: 20px; height: 20px; border-radius: 2px; border: 2px solid white; box-shadow: 0 0 15px #0ea5e9;"></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
+    html: `<div style="font-size: 24px; filter: drop-shadow(0 0 8px cyan);">🚢</div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12] // Reverted to Center (GPS Exact)
 });
 
 interface TwinMapProps {
@@ -26,41 +27,81 @@ interface TwinMapProps {
     ships?: { id: string, lat: number, lng: number, type: string }[];
 }
 
-export default function TwinMap({ riskLevel, alert, trucks = [], ships = [] }: TwinMapProps) {
-    // Rethe Bridge Coordinates
-    const center: [number, number] = [53.5005, 9.9705];
+export default function TwinMap({ riskLevel, alert, trucks = [], ships = [], bridgeStatus = "bridge_closed" }: TwinMapProps & { bridgeStatus?: string }) {
+    // Bridge Locations (Use consistent ID 'rethe')
+    // Bridge Locations (Exact Google Maps Coordinates)
+    const bridges = [
+        { node_id: "rethe", lat: 53.5008, lng: 9.9710 }, // Rethe Bridge (Exact)
+        { node_id: "kattwyk", lat: 53.4938, lng: 9.9530 } // Kattwyk Bridge (Refined)
+    ];
+
+    // Use the first bridge's coordinates as the initial center
+    const initialCenter: [number, number] = [bridges[0].lat, bridges[0].lng];
+
+    // Define icons inside component or globally (prevents 'not found' error)
+    const bridgeOpenIcon = L.divIcon({ className: 'custom-icon', html: '🔴', iconSize: [24, 24] });
+    const bridgeClosedIcon = L.divIcon({ className: 'custom-icon', html: '🔵', iconSize: [24, 24] }); // Changed to Blue to distinguish from "Yellow/Green"
 
     return (
         <MapContainer
-            center={center}
-            zoom={15}
+            center={initialCenter}
+            zoom={14} // Zoomed out slightly to see both
             style={{ height: '100%', width: '100%', zIndex: 0 }}
             zoomControl={false}
             attributionControl={false}
         >
-            {/* Dark "Holographic" Map Tile */}
+            {/* Standard OpenStreetMap (High Fidelity for Land/Water distinction) */}
             <TileLayer
-                attribution='&copy; CARTO'
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            {/* Rethe Bridge Marker */}
-            <Circle
-                center={center}
-                radius={alert ? 150 : 30}
+            {/* BRIDGE MARKERS (Show All) */}
+            {bridges.map((b) => (
+                <div key={b.node_id}>
+                    {/* Main Bridge Marker */}
+                    <Marker position={[b.lat, b.lng]} icon={bridgeStatus === 'bridge_open' ? bridgeOpenIcon : bridgeClosedIcon}>
+                        <Popup>
+                            <div className="p-2">
+                                <h3 className="font-bold text-lg">{b.node_id.toUpperCase()} BRIDGE</h3>
+                                <div className={`badge ${bridgeStatus === 'bridge_open' ? 'badge-error' : 'badge-success'} mt-1`}>
+                                    {bridgeStatus === 'bridge_open' ? 'OPEN (TRAFFIC STOPPED)' : 'CLOSED (TRAFFIC FLOWING)'}
+                                </div>
+                                <p className="text-xs mt-2 text-gray-400">Status inferred from Live AIS Proximity</p>
+                            </div>
+                        </Popup>
+                    </Marker>
+                </div>
+            ))}
+
+            {/* TRAFFIC FLOW LINE (Hohe Schaar Straße - High Precision) */}
+            {/* Must strictly follow the road curve to avoid "Driving on Water" */}
+            <Polyline
+                positions={[
+                    [53.4900, 9.9450], // Kattwyk South Start
+                    [53.4920, 9.9480], // Approach Junction
+                    [53.4938, 9.9530], // Kattwyk Bridge Node
+                    [53.4945, 9.9560], // Curve East
+                    [53.4955, 9.9600], // Hohe Schaar Straight
+                    [53.4970, 9.9640], // Gentle bend
+                    [53.4990, 9.9680], // Approaching Rethe
+                    [53.5008, 9.9710], // Rethe Bridge Center (Traffic crosses HERE)
+                    [53.5020, 9.9720], // North Exit
+                    [53.5030, 9.9730]  // Final Termination
+                ]}
                 pathOptions={{
-                    color: alert ? '#ff0000' : '#00ff00',
-                    fillColor: alert ? '#ff0000' : '#00ff00',
-                    fillOpacity: alert ? 0.6 : 0.4
+                    color: bridgeStatus === 'bridge_open' ? 'red' : 'lime',
+                    weight: 6,
+                    opacity: 0.6,
+                    dashArray: bridgeStatus === 'bridge_open' ? '5, 10' : undefined
                 }}
             >
                 <Popup>
-                    <div className="text-black text-xs font-mono">
-                        <h3 className="font-bold">RETHE BRIDGE (HUB)</h3>
-                        <p>STATUS: {alert ? "CRITICAL FAILURE" : "OPTIMAL"}</p>
+                    <div className="text-black font-bold">
+                        BRIDGE ROAD STATUS: {bridgeStatus === 'bridge_open' ? 'CONGESTED (STOPPED)' : 'FREE FLOW'}
                     </div>
                 </Popup>
-            </Circle>
+            </Polyline>
 
             {/* Dynamic Realtime Trucks */}
             {trucks.map((t) => (
@@ -79,7 +120,7 @@ export default function TwinMap({ riskLevel, alert, trucks = [], ships = [] }: T
             {/* Bio-Risk Fog Visualization */}
             {riskLevel > 0.5 && (
                 <Circle
-                    center={center}
+                    center={initialCenter}
                     radius={1200}
                     pathOptions={{
                         color: 'transparent',

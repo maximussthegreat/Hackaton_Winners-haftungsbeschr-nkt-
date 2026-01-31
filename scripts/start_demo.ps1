@@ -21,11 +21,11 @@ Get-Process -Name "node" -ErrorAction SilentlyContinue | Stop-Process -Force # B
 
 # Start BRAIN (Visible Window, Persistent)
 Write-Host "Launching BRAIN (Cognition Layer) on Port 8002..."
-Start-Process "cmd" "/k call venv\Scripts\activate && python -m uvicorn brain.main:app --reload --port 8002 --host 127.0.0.1" -WorkingDirectory "$projectRoot"
+Start-Process "cmd" "/k call venv\Scripts\activate && python -m uvicorn brain.main:app --port 8002 --host 127.0.0.1" -WorkingDirectory "$projectRoot"
 
 # Start EYE (Visible Window, Persistent)
 Write-Host "Launching EYE (Perception Layer) on Port 8001..."
-Start-Process "cmd" "/k call venv\Scripts\activate && python -m uvicorn eye.main:app --reload --port 8001 --host 127.0.0.1" -WorkingDirectory "$projectRoot"
+Start-Process "cmd" "/k call venv\Scripts\activate && python -m uvicorn eye.main:app --port 8001 --host 127.0.0.1" -WorkingDirectory "$projectRoot"
 
 # Start TWIN (Visible Window, Persistent)
 Write-Host "Launching TWIN (Interaction Layer) on Port 3000..."

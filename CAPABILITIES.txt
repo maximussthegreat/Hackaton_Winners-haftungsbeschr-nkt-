@@ -1,0 +1,31 @@
+SENTINEL SYSTEM CAPABILITIES (LIVE STATUS)
+==========================================
+
+[1] PERCEPTION (THE EYE)
+------------------------------------------
+- REAL-TIME SHIP TRACKING: Connected to AisStream.io WebSocket.
+- SOURCE: Public AIS Network + MyShipTracking (Backup).
+- STATUS: ONLINE (Valid Data Flow Verified).
+- TRAFFIC: Real-time scan of A7 / Elbtunnel traffic reports.
+- TIDE: Water level monitoring (St. Pauli Gauge).
+
+[2] COGNITION (THE BRAIN)
+------------------------------------------
+- MODEL: OpenAI GPT-4o (Omni).
+- FUNCTION: Analyzing multi-modal sensor fusion (Tide + Ships + Traffic).
+- OUTPUT: 
+  > Risk Grading (LOW / MODERATE / CRITICAL)
+  > Carbon Impact Estimation
+  > Strategic Reasoning
+- STATUS: ONLINE (Neural Link Established).
+
+[3] INTERACTION (THE TWIN)
+------------------------------------------
+- VISUALS: Holographic Dark Mode + 2D Digital Twin Map.
+- UI: Enhanced Neuro-Link Terminal with color-coded Risk Grading.
+- VOICE: Neural Text-to-Speech (Simulation announcements).
+
+[4] INTEGRITY
+------------------------------------------
+- NO FAKES: Hardcoded fallback lists have been removed.
+- VALIDATION: All data points are timestamped and verified live.

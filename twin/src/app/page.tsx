@@ -17,6 +17,8 @@ interface Savings { fuel_saved_l: number; money_saved_eur: number; co2_saved_kg:
 interface SentinelState {
   simulation_active: boolean;
   system_logs: string[];
+  ai_thought?: string;
+  risk_grade?: string;
   visual_truth: {
     confidence: number;
     trucks?: Truck[];
@@ -96,7 +98,12 @@ export default function Home() {
 
       {/* System Console - Bottom Left */}
       <div className="absolute bottom-6 left-6 z-20 pointer-events-auto">
-        <SystemConsole logs={state.system_logs || []} />
+        {/* @ts-ignore */}
+        <SystemConsole
+          logs={state.system_logs || []}
+          aiThought={state.ai_thought}
+          riskGrade={state.risk_grade}
+        />
       </div>
 
       {/* Alert Overlay */}

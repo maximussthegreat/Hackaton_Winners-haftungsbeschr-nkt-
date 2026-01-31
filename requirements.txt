@@ -5,3 +5,4 @@ websockets
 httpx
 pydantic
 requests
+beautifulsoup4
