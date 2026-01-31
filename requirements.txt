@@ -1,0 +1,23 @@
+# Core
+fastapi
+uvicorn
+requests
+pydantic
+python-dotenv
+
+# Computer Vision (The Eye)
+ultralytics
+opencv-python-headless
+selenium
+webdriver-manager
+numpy
+
+# Data Science & Simulation (The Brain)
+pandas
+scikit-learn
+epydemix
+networkx
+
+# Utilities
+httpx
+loguru

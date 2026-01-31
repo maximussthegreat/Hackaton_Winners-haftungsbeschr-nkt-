@@ -1,51 +1,66 @@
-# Cursor 2-Day AI Hackathon — Repo Template
+# SENTINEL: The All-Seeing Port Brain
 
-![Cursor 2-Day AI Hackathon](https://ai-beavers.com/_next/image?url=%2Fimages%2Fhackathon-hero-20012026.png&w=1920&q=75)
+> **Grand Prize Architecture & Strategic Execution Plan**
 
-**How to use this template:**
+![Sentinel Vision](https://via.placeholder.com/800x400?text=SENTINEL:+The+All-Seeing+Port+Brain)
 
-1. Click "Use this template" → "Create a new repository"
-2. Name your repo and set it to **Public**
-3. Replace this section with your project name and description
+## Executive Summary
 
----
+The **SENTINEL** platform represents a fundamental paradigm shift from passive monitoring to active, agentic verification. By integrating the **'Eye of Hamburg'** (computer vision), **'The Brain'** (conflict resolution & risk modeling), and **'The Twin'** (3D holographic interaction), SENTINEL verifies physical reality against digital metadata to optimize the Port of Hamburg in real-time.
 
-# Project Name
+## Architecture: The Cyber-Physical Panopticon
 
-> One-line description of your project
+### 1. The Eye (Perception Layer)
 
-## Tech Stack
+- **Path**: `/eye`
+- **Tech**: Python, YOLOv8, OpenCV, Selenium
+- **Function**: Visual scraping of HPA webcams, Optical Flow analysis, Bridge state classification. Verifies "Ground Truth".
 
-What technologies power your project?
+### 2. The Brain (Cognition Layer)
 
-<!-- List your main technologies, frameworks, and services -->
+- **Path**: `/brain`
+- **Tech**: Python, FastAPI, Epydemix (Bio-Risk), Scikit-Learn
+- **Function**: Conflict Engine (API vs. Visual), Economic Ticker (Carbon/Fuel Savings), Congestion Modeling.
 
-- **Frontend**: e.g., Next.js, React, Tailwind
-- **Backend**: e.g., Node.js, Python, FastAPI
-- **Database**: e.g., Supabase, Firebase, PostgreSQL
-- **AI/ML**: e.g., OpenAI GPT-4, Gemini Pro
-- **Hosting**: e.g., Vercel, Railway
+### 3. The Twin (Interaction Layer)
 
-## How to Run
+- **Path**: `/twin`
+- **Tech**: Next.js, React Three Fiber, Three.js, WebGL
+- **Function**: Volumetric 3D visualization, Bio-Risk fog overlay, Real-time vessel tracking.
 
-Step-by-step instructions to run the project locally, including everything that needs to be set up.
+## Getting Started
 
-```bash
-# Clone the repo
-git clone https://github.com/your-team/your-project.git
-cd your-project
+### Prerequisites
 
-# Install dependencies
-npm install
+- Node.js 18+
+- Python 3.9+
 
-# Set up environment variables
-cp .env.example .env
-# Add your API keys to .env
+### Installation
 
-# Run the development server
-npm run dev
-```
+1. **Clone the repo**
 
-## Details
+   ```bash
+   git clone https://github.com/maximussthegreat/Hackaton_Winners-haftungsbeschr-nkt-.git
+   cd Hackaton_Winners-haftungsbeschr-nkt-
+   ```
 
-Add anything else you want to share: architecture diagrams, screenshots, challenges faced, future plans, etc.
+2. **Setup The Twin (Frontend)**
+
+   ```bash
+   cd twin
+   npm install
+   npm run dev
+   ```
+
+3. **Setup The Eye & Brain (Backend)**
+
+   ```bash
+   # From root
+   python -m venv venv
+   .\venv\Scripts\Activate
+   pip install -r requirements.txt
+   ```
+
+## Key Commands
+
+- **Antigravity, simulate sensor failure**: Triggers the main demo loop.
