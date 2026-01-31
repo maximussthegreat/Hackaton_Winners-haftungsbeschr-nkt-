@@ -10,14 +10,31 @@ const TwinMap = dynamic(() => import('@/components/TwinMap'), {
   loading: () => <div className="text-white p-10">Loading Holographic Twin...</div>
 });
 
+interface Truck { id: string; lat: number; lng: number; }
+interface Ship { id: string; lat: number; lng: number; type: string; }
+interface Savings { fuel_saved_l: number; money_saved_eur: number; co2_saved_kg: number; }
+
+interface SentinelState {
+  simulation_active: boolean;
+  system_logs: string[];
+  visual_truth: {
+    confidence: number;
+    trucks?: Truck[];
+    ships?: Ship[];
+  };
+  savings: Savings;
+}
+
 export default function Home() {
   const [riskLevel, setRiskLevel] = useState(0.0);
-  const [metrics, setMetrics] = useState({ fuel_saved_l: 0, money_saved_eur: 0, co2_saved_kg: 0 });
+  const [metrics, setMetrics] = useState<Savings>({ fuel_saved_l: 0, money_saved_eur: 0, co2_saved_kg: 0 });
   const [alert, setAlert] = useState<string | null>(null);
-  const [state, setState] = useState({
+
+  const [state, setState] = useState<SentinelState>({
     simulation_active: false,
     system_logs: ["Initialize..."],
-    visual_truth: { confidence: 0.0 }
+    visual_truth: { confidence: 0.0, trucks: [], ships: [] },
+    savings: { fuel_saved_l: 0, money_saved_eur: 0, co2_saved_kg: 0 }
   });
 
   // Polling for simulation state
@@ -64,7 +81,9 @@ export default function Home() {
             </div>
             <div>
               <span className="block text-gray-600">EYE CONFIDENCE</span>
-              <span className="text-cyan-400 text-xl">{(state.visual_truth?.confidence || 0) * 100}%</span>
+              <span className="text-cyan-400 text-xl">
+                {state.visual_truth?.confidence ? (state.visual_truth.confidence * 100).toFixed(1) : "0.0"}%
+              </span>
             </div>
           </div>
         </div>
@@ -92,7 +111,12 @@ export default function Home() {
 
       {/* 2D Map Layer (Realistic Twin) */}
       <div className="absolute inset-0 z-0">
-        <TwinMap riskLevel={riskLevel} alert={alert} />
+        <TwinMap
+          riskLevel={riskLevel}
+          alert={alert}
+          trucks={state.visual_truth?.trucks || []}
+          ships={state.visual_truth?.ships || []}
+        />
       </div>
 
     </main>
