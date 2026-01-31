@@ -11,6 +11,7 @@ from brain.economics import EconomicsEngine
 from brain.risk import RiskEngine
 from brain.api import SentinelAPI
 from brain.voice import VoiceAgent
+from brain.history import historian
 
 app = FastAPI(title="SENTINEL: The Brain")
 
@@ -28,8 +29,8 @@ from brain.cognition import LLMService
 # Replaced old engines with The Cognitive Core
 llm_service = LLMService()
 # conflict_engine = ConflictEngine() # Deprecated
-# economics_engine = EconomicsEngine() # Deprecated
-# risk_engine = RiskEngine() # Deprecated
+economics_engine = EconomicsEngine()
+risk_engine = RiskEngine()
 sentinel_api = SentinelAPI()
 voice_agent = VoiceAgent()
 
@@ -61,6 +62,7 @@ async def poll_eyes():
                 aggregated_ships = []
                 aggregated_trucks = []
                 tide_level = 0
+                weather_info = {"condition": "CLEAR"} # Default
                 all_traffic_alerts = []
                 
                 for node in nodes:
@@ -75,6 +77,8 @@ async def poll_eyes():
                             aggregated_ships = data.get("ships", [])
                         if "tide_level_m" in data:
                             tide_level = data["tide_level_m"]
+                        if "weather" in data:
+                             weather_info = data["weather"]
                         if "traffic_alerts" in data:
                             all_traffic_alerts.extend(data["traffic_alerts"])
 
@@ -83,6 +87,7 @@ async def poll_eyes():
                     "ships": aggregated_ships,
                     "trucks": aggregated_trucks,
                     "tide": tide_level,
+                    "weather": weather_info,
                     "traffic_alerts": list(set(all_traffic_alerts)), # Deduplicate
                     "nodes": nodes
                 }
@@ -99,7 +104,24 @@ async def poll_eyes():
                     if "ai_thought" in thought:
                          add_log("SENTINEL MIND", f"THOUGHT: {thought['ai_thought']}")
                          current_state["ai_thought"] = thought["ai_thought"] # Persist for UI
+                         current_state["ai_thought"] = thought["ai_thought"] # Persist for UI
                          current_state["risk_grade"] = thought.get("risk_grade", "LOW") # Persist for UI
+ 
+                    # 4. TIDAL ECONOMICS CHECK (New from Jan 2026 Report)
+                    # Check for deep draft vessels in current view
+                    for ship_data in current_state["visual_truth"].get("ships", []):
+                        # Heuristic: Identify Megamax by name or type
+                        s_id = ship_data.get("id", "").upper()
+                        if "TRIUMPH" in s_id or "NUBA" in s_id:
+                            # It's a Deep Draft Vessel (16m)
+                            tide = current_state["visual_truth"].get("tide", 0)
+                            delay_analysis = economics_engine.calculate_tidal_delay_cost(16.0, tide)
+                            
+                            if delay_analysis["status"] == "DELAYED":
+                                msg = f"TIDAL WARNING: {s_id} delayed. Cost: €{delay_analysis['cost_eur']}"
+                                add_log("ECON", msg)
+                                # Add to savings (negative savings? or just impact)
+                                # current_state["savings"]["potential_loss"] = delay_analysis["cost_eur"]
 
                     if thought.get("action") == "OPEN_BRIDGE":
                          add_log("COMMAND", "Directing Bridge Operators: OPEN.")
@@ -149,20 +171,30 @@ def trigger_simulation():
     current_state["simulation_active"] = True
     
     # Calculate mock savings
-    # engines deprecated - using hardcoded mock for simulation demo
-    savings = {"fuel_saved_l": 120, "co2_saved_kg": 350, "money_saved_eur": 500}
+    # Calculate mock savings using Real Economics Engine
+    # answering "Real Data" promise: Use actual visible trucks if any
+    
+    visible_truck_count = len(current_state["visual_truth"].get("trucks", []))
+    affected_trucks = visible_truck_count if visible_truck_count > 0 else 42
+    
+    savings = economics_engine.calculate_savings(trucks_rerouted=affected_trucks, time_saved_hours=0.75)
     current_state["savings"] = savings
-    current_state["trucks_rerouted"] = 42
+    current_state["trucks_rerouted"] = affected_trucks
     
     # Calculate risk
-    risk = 100 # risk_engine.calculate_risk(blocked_nodes=["rethe_bridge"])
+    # Calculate risk
+    # Dynamic Weather Risk from recent state
+    w_cond = current_state["visual_truth"].get("weather", {}).get("condition", "CLEAR")
+    risk = risk_engine.calculate_risk(blocked_nodes=["rethe_bridge"], weather_condition=w_cond) * 100
+    
+    # Generate speech
     
     # Generate speech
     speech = {"text": "Simulation Active. Rerouting traffic.", "audio": None} # voice_agent.generate_climax_speech(savings)
     
     add_log("ALERT", "CRITICAL ANOMALY DETECTED at Rethe Bridge")
-    add_log("DECISION", "Calculated Risk Level: 100%. Initiating Protocol: ZERO_HOUR")
-    add_log("ACTION", f"Broadcasting Reroute Instructions to {42} connected drivers.")
+    add_log("DECISION", f"Calculated Risk Level: {risk}%. Initiating Protocol: ZERO_HOUR")
+    add_log("ACTION", f"Broadcasting Reroute Instructions to {affected_trucks} connected drivers.")
     
     return {
         "event": "CRITICAL_OVERRIDE",
@@ -182,6 +214,53 @@ def process_voice_command(command: dict):
         trigger_simulation()
         
     return response
+
+@app.get("/history")
+def get_history():
+    """Returns 24h of historical ship movements"""
+    return historian.get_24h_history()
+
+@app.post("/playback/state")
+def receive_playback_state(data: dict):
+    """
+    Receives state during historic playback from the UI.
+    AI can analyze patterns in historical ship movements.
+    """
+    timestamp = data.get("timestamp", "")
+    ships = data.get("ships", [])
+    tide = data.get("tide_level_m", 0)
+    mode = data.get("mode", "UNKNOWN")
+    
+    # Log for AI awareness
+    add_log("PLAYBACK", f"Time: {timestamp[:16]}... | Ships: {len(ships)} | Tide: {tide:.1f}m")
+    
+    # Update state so AI can see historical context
+    current_state["playback_mode"] = mode
+    current_state["playback_timestamp"] = timestamp
+    current_state["playback_ships"] = ships
+    current_state["playback_tide"] = tide
+    
+    # Optionally trigger AI analysis on historical data
+    if len(ships) > 0 and random.random() < 0.3:  # 30% chance to analyze
+        underway = len([s for s in ships if s.get("status") == "UNDERWAY"])
+        moored = len([s for s in ships if s.get("status") == "MOORED"])
+        
+        thought = f"HISTORIC ANALYSIS: At {timestamp[:16]}, observed {underway} vessels underway, {moored} moored. Tide was {tide:.1f}m."
+        add_log("SENTINEL AI", thought)
+        current_state["ai_thought"] = thought
+    
+    return {"received": True, "ships_count": len(ships)}
+
+@app.get("/vessel/{identifier}")
+def get_vessel_info(identifier: str):
+    """
+    Get detailed vessel information by name, IMO, or MMSI.
+    Returns real ship registry data.
+    """
+    info = historian.get_vessel_info(identifier)
+    if info:
+        return info
+    raise HTTPException(status_code=404, detail=f"Vessel '{identifier}' not found")
 
 if __name__ == "__main__":
     logger.info("Starting The Brain...")

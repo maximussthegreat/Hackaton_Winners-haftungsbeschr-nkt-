@@ -1,29 +1,37 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 
-// Fix for "window is not defined" (Leaflet SSR Error)
-const TwinMap = dynamic(() => import('./TwinMap'), {
-    ssr: false,
-    loading: () => <div className="h-full w-full bg-slate-900 flex items-center justify-center text-cyan-500">INITIALIZING TWIN...</div>
-});
 
-interface LogProps {
+interface SystemConsoleProps {
     logs: string[];
     aiThought?: string;
     riskGrade?: string;
+    // New Props for full Brain State
+    trucks: any[];
+    ships: any[];
+    tideLevel?: number;
+    tideVerified?: string;
+    trafficData: { incidents: string[], verified_at: string };
 }
 
-export default function SystemConsole({ logs, aiThought, riskGrade }: LogProps) {
-    const [riskLevel, setRiskLevel] = useState(0);
-    const [alert, setAlert] = useState<string | null>(null);
-    const [trucks, setTrucks] = useState([]);
-    const [ships, setShips] = useState([]);
-    const [tideLevel, setTideLevel] = useState<number | null>(null);
-    const [trafficData, setTrafficData] = useState<{ incidents: string[], verified_at: string }>({ incidents: [], verified_at: "LIVE" });
-    const [tideVerified, setTideVerified] = useState<string>("LIVE");
-    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+export default function SystemConsole({
+    logs,
+    aiThought,
+    riskGrade,
+    trucks = [],
+    ships = [],
+    tideLevel,
+    tideVerified,
+    trafficData = { incidents: [], verified_at: "LIVE" }
+}: SystemConsoleProps) {
+    // Use props directly or derive from them. 
+    // We expect the parent (page.tsx) to pass all relevant real-time data from the Brain.
+
+    // Derived state for display
+    const currentAlert = riskGrade === 'CRITICAL' ? 'BRIDGE OPEN' : null;
+    const currentRisk = riskGrade === 'CRITICAL' ? 0.8 : (riskGrade === 'MODERATE' ? 0.5 : 0.0);
+
 
     // Color Logic for Risk Grade
     const getRiskColor = (grade: string) => {
@@ -36,54 +44,13 @@ export default function SystemConsole({ logs, aiThought, riskGrade }: LogProps) 
 
     const riskColorClass = getRiskColor(riskGrade || 'LOW');
 
-    useEffect(() => {
-        const fetchStatus = async () => {
-            try {
-                // REAL API CONNECTION (No Simulation)
-                const response = await fetch('http://localhost:8001/status?node_id=rethe');
-                const data = await response.json();
+    // Removed internal polling to localhost:8001. 
+    // Data now flows: Eye (8001) -> Brain (8002) -> Page.tsx -> SystemConsole
 
-                if (data.risk_level) setRiskLevel(data.risk_level);
-                if (data.class) setAlert(data.class === 'bridge_open' ? 'BRIDGE OPEN' : null);
-
-                if (data.ships) setShips(data.ships);
-                if (data.trucks) setTrucks(data.trucks);
-
-                // Real Tide Data
-                if (data.tide_level_m !== undefined) setTideLevel(data.tide_level_m);
-                if (data.tide_verified_at) setTideVerified(data.tide_verified_at);
-
-                // Real Traffic Data
-                if (data.traffic_data) {
-                    setTrafficData({
-                        incidents: Array.isArray(data.traffic_data.incidents) ? data.traffic_data.incidents : [],
-                        verified_at: data.traffic_data.verified_at || "LIVE"
-                    });
-                }
-
-                setLastUpdate(new Date());
-            } catch (err) {
-                // console.error("Connection Lost:", err); 
-            } finally {
-                setTimeout(fetchStatus, 5000);
-            }
-        };
-
-        fetchStatus();
-    }, []);
 
     return (
         <div className="flex h-screen w-screen bg-black text-green-500 font-mono overflow-hidden relative">
-            {/* BACKGROUND LAYER: MAP */}
-            <div className="absolute inset-0 z-0">
-                <TwinMap
-                    riskLevel={riskLevel}
-                    alert={alert}
-                    trucks={trucks}
-                    ships={ships}
-                    bridgeStatus={alert === 'BRIDGE OPEN' ? 'bridge_open' : 'bridge_closed'}
-                />
-            </div>
+
 
             {/* FOREGROUND LAYER: CONSOLE UI - NOW LARGER & GRADED */}
             <div className={`absolute bottom-6 left-6 z-10 bg-black/90 border-2 p-6 rounded-xl font-mono text-sm w-[40rem] backdrop-blur-md transition-all duration-500 ${riskColorClass}`}>
@@ -115,8 +82,8 @@ export default function SystemConsole({ logs, aiThought, riskGrade }: LogProps) 
                     </div>
                     <div>
                         <span className="text-gray-500 block">BRIDGE STATUS</span>
-                        <span className={`text-lg font-bold ${alert === 'BRIDGE OPEN' ? 'text-red-500 animate-pulse' : 'text-green-500'}`}>
-                            {alert ? 'OPEN (TRAFFIC HALTED)' : 'LOCKED (FLOWING)'}
+                        <span className={`text-lg font-bold ${currentAlert === 'BRIDGE OPEN' ? 'text-red-500 animate-pulse' : 'text-green-500'}`}>
+                            {currentAlert ? 'OPEN (TRAFFIC HALTED)' : 'LOCKED (FLOWING)'}
                         </span>
                     </div>
                 </div>
@@ -156,7 +123,7 @@ export default function SystemConsole({ logs, aiThought, riskGrade }: LogProps) 
                                 onClick={() => window.alert(`[SENTINEL PROTOCOL]\n\nIssue: ${log}\n\nRecommended Action: Dispatch Port Authority Unit.`)}
                             >
                                 <div className="flex justify-between opacity-70 text-xxs mb-1">
-                                    <span>{new Date().toLocaleTimeString()}</span>
+                                    <span suppressHydrationWarning>{new Date().toLocaleTimeString()}</span>
                                     <span className="group-hover:opacity-100 opacity-0 text-cyan-500">[RESOLVE]</span>
                                 </div>
                                 <div className="whitespace-normal leading-relaxed">

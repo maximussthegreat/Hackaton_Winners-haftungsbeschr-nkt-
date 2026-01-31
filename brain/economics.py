@@ -3,6 +3,9 @@ class EconomicsEngine:
         self.diesel_price_eur = 1.75
         self.co2_per_liter = 2.64
         self.idling_consumption_lph = 3.0
+        # New: Megamax Economics (from Jan 2026 Report)
+        self.megamax_hourly_charter_rate = 5000.0 # Approx cost of delay per hour for 20k TEU
+        self.dredging_op_cost_daily = 35000.0 # Cost of keeping channel open
 
     def calculate_savings(self, trucks_rerouted: int, time_saved_hours: float):
         fuel_saved_liters = trucks_rerouted * time_saved_hours * self.idling_consumption_lph
@@ -14,3 +17,25 @@ class EconomicsEngine:
             "money_saved_eur": round(money_saved_eur, 2),
             "co2_saved_kg": round(co2_saved_kg, 2)
         }
+
+    def calculate_tidal_delay_cost(self, draft_m: float, tide_level_m: float):
+        """
+        Calculates financial impact if a ship misses its tidal window.
+        Based on 'The Tidal Constraint' (Report Section 3.2).
+        """
+        # Simple heuristic: If draft > 14.5 + tide, ship waits 12 (one tide cycle)
+        safety_margin = 1.0
+        required_depth = draft_m + safety_margin
+        # Elbe depth approx 17m but let's say constraint is relevant relative to tide
+        
+        # If ship is DEEP (e.g. ONE TRIUMPH @ 16m), and Tide is LOW, it waits.
+        if draft_m > 15.0 and tide_level_m < 1.0:
+            delay_hours = 6.0 # Wait for High Water
+            cost = delay_hours * self.megamax_hourly_charter_rate
+            return {
+                "status": "DELAYED",
+                "reason": "TIDAL_WINDOW_MISSED",
+                "cost_eur": cost,
+                "delay_h": delay_hours
+            }
+        return {"status": "ON_TIME", "cost_eur": 0.0, "delay_h": 0}

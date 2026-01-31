@@ -1,10 +1,11 @@
 'use client';
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { useEffect } from 'react';
 
-// Custom Icons
+// TomTom API Key
+const TOMTOM_API_KEY = 'hcgO55oPrfrKQtQYL45OMBDB705jrZcV';
+
 // Custom Icons with Emojis
 const truckIcon = L.divIcon({
     className: 'custom-div-icon',
@@ -17,91 +18,76 @@ const shipIcon = L.divIcon({
     className: 'custom-div-icon',
     html: `<div style="font-size: 24px; filter: drop-shadow(0 0 8px cyan);">🚢</div>`,
     iconSize: [24, 24],
-    iconAnchor: [12, 12] // Reverted to Center (GPS Exact)
+    iconAnchor: [12, 12]
 });
 
 interface TwinMapProps {
     riskLevel: number;
     alert: string | null;
     trucks?: { id: string, lat: number, lng: number }[];
-    ships?: { id: string, lat: number, lng: number, type: string }[];
+    ships?: { id: string, lat: number, lng: number, type: string, imo?: string, mmsi?: string, status?: string }[];
+    showTraffic?: boolean;
 }
 
-export default function TwinMap({ riskLevel, alert, trucks = [], ships = [], bridgeStatus = "bridge_closed" }: TwinMapProps & { bridgeStatus?: string }) {
-    // Bridge Locations (Use consistent ID 'rethe')
-    // Bridge Locations (Exact Google Maps Coordinates)
+export default function TwinMap({
+    riskLevel,
+    alert,
+    trucks = [],
+    ships = [],
+    bridgeStatus = "bridge_closed",
+    showTraffic = false
+}: TwinMapProps & { bridgeStatus?: string }) {
+    // Bridge Locations
     const bridges = [
-        { node_id: "rethe", lat: 53.5008, lng: 9.9710 }, // Rethe Bridge (Exact)
-        { node_id: "kattwyk", lat: 53.4938, lng: 9.9530 } // Kattwyk Bridge (Refined)
+        { node_id: "rethe", lat: 53.5008, lng: 9.9710 },
+        { node_id: "kattwyk", lat: 53.4938, lng: 9.9530 }
     ];
 
-    // Use the first bridge's coordinates as the initial center
     const initialCenter: [number, number] = [bridges[0].lat, bridges[0].lng];
 
-    // Define icons inside component or globally (prevents 'not found' error)
     const bridgeOpenIcon = L.divIcon({ className: 'custom-icon', html: '🔴', iconSize: [24, 24] });
-    const bridgeClosedIcon = L.divIcon({ className: 'custom-icon', html: '🔵', iconSize: [24, 24] }); // Changed to Blue to distinguish from "Yellow/Green"
+    const bridgeClosedIcon = L.divIcon({ className: 'custom-icon', html: '🔵', iconSize: [24, 24] });
+
+    // TomTom Traffic Overlay URL - relative0 style is TRANSPARENT
+    const tomtomTrafficFlow = `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`;
 
     return (
         <MapContainer
             center={initialCenter}
-            zoom={14} // Zoomed out slightly to see both
+            zoom={14}
             style={{ height: '100%', width: '100%', zIndex: 0 }}
             zoomControl={false}
             attributionControl={false}
         >
-            {/* Standard OpenStreetMap (High Fidelity for Land/Water distinction) */}
+            {/* Base Map: CartoDB Voyager - ALWAYS visible */}
             <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; OpenStreetMap &copy; CARTO'
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
 
-            {/* BRIDGE MARKERS (Show All) */}
-            {bridges.map((b) => (
-                <div key={b.node_id}>
-                    {/* Main Bridge Marker */}
-                    <Marker position={[b.lat, b.lng]} icon={bridgeStatus === 'bridge_open' ? bridgeOpenIcon : bridgeClosedIcon}>
-                        <Popup>
-                            <div className="p-2">
-                                <h3 className="font-bold text-lg">{b.node_id.toUpperCase()} BRIDGE</h3>
-                                <div className={`badge ${bridgeStatus === 'bridge_open' ? 'badge-error' : 'badge-success'} mt-1`}>
-                                    {bridgeStatus === 'bridge_open' ? 'OPEN (TRAFFIC STOPPED)' : 'CLOSED (TRAFFIC FLOWING)'}
-                                </div>
-                                <p className="text-xs mt-2 text-gray-400">Status inferred from Live AIS Proximity</p>
-                            </div>
-                        </Popup>
-                    </Marker>
-                </div>
-            ))}
+            {/* TomTom Traffic Flow Overlay - ALWAYS rendered, toggle via opacity */}
+            <TileLayer
+                url={tomtomTrafficFlow}
+                opacity={showTraffic ? 0.8 : 0}
+            />
 
-            {/* TRAFFIC FLOW LINE (Hohe Schaar Straße - High Precision) */}
-            {/* Must strictly follow the road curve to avoid "Driving on Water" */}
-            <Polyline
-                positions={[
-                    [53.4900, 9.9450], // Kattwyk South Start
-                    [53.4920, 9.9480], // Approach Junction
-                    [53.4938, 9.9530], // Kattwyk Bridge Node
-                    [53.4945, 9.9560], // Curve East
-                    [53.4955, 9.9600], // Hohe Schaar Straight
-                    [53.4970, 9.9640], // Gentle bend
-                    [53.4990, 9.9680], // Approaching Rethe
-                    [53.5008, 9.9710], // Rethe Bridge Center (Traffic crosses HERE)
-                    [53.5020, 9.9720], // North Exit
-                    [53.5030, 9.9730]  // Final Termination
-                ]}
-                pathOptions={{
-                    color: bridgeStatus === 'bridge_open' ? 'red' : 'lime',
-                    weight: 6,
-                    opacity: 0.6,
-                    dashArray: bridgeStatus === 'bridge_open' ? '5, 10' : undefined
-                }}
-            >
-                <Popup>
-                    <div className="text-black font-bold">
-                        BRIDGE ROAD STATUS: {bridgeStatus === 'bridge_open' ? 'CONGESTED (STOPPED)' : 'FREE FLOW'}
-                    </div>
-                </Popup>
-            </Polyline>
+            {/* BRIDGE MARKERS */}
+            {bridges.map((b) => (
+                <Marker
+                    key={b.node_id}
+                    position={[b.lat, b.lng]}
+                    icon={bridgeStatus === 'bridge_open' ? bridgeOpenIcon : bridgeClosedIcon}
+                >
+                    <Popup>
+                        <div className="p-2">
+                            <h3 className="font-bold text-lg">{b.node_id.toUpperCase()} BRIDGE</h3>
+                            <div className={`badge ${bridgeStatus === 'bridge_open' ? 'badge-error' : 'badge-success'} mt-1`}>
+                                {bridgeStatus === 'bridge_open' ? 'OPEN (TRAFFIC STOPPED)' : 'CLOSED (TRAFFIC FLOWING)'}
+                            </div>
+                        </div>
+                    </Popup>
+                </Marker>
+            ))}
 
             {/* Dynamic Realtime Trucks */}
             {trucks.map((t) => (
@@ -110,10 +96,48 @@ export default function TwinMap({ riskLevel, alert, trucks = [], ships = [], bri
                 </Marker>
             ))}
 
-            {/* Dynamic Realtime Ships */}
+            {/* Dynamic Realtime Ships with Rich Info Popups */}
             {ships.map((s) => (
                 <Marker key={s.id} position={[s.lat, s.lng]} icon={shipIcon}>
-                    <Popup><div className="text-black text-xs">{s.id}</div></Popup>
+                    <Popup>
+                        <div className="text-black text-xs min-w-[180px]">
+                            <div className="font-bold text-sm border-b pb-1 mb-1">{s.id}</div>
+                            <div className="grid grid-cols-2 gap-1">
+                                <span className="text-gray-500">Type:</span>
+                                <span>{s.type || 'Unknown'}</span>
+                                {s.status && (
+                                    <>
+                                        <span className="text-gray-500">Status:</span>
+                                        <span className={`font-semibold ${s.status === 'UNDERWAY' ? 'text-green-600' : s.status === 'MOORED' ? 'text-blue-600' : 'text-orange-500'}`}>
+                                            {s.status}
+                                        </span>
+                                    </>
+                                )}
+                                {s.imo && (
+                                    <>
+                                        <span className="text-gray-500">IMO:</span>
+                                        <span>{s.imo}</span>
+                                    </>
+                                )}
+                                {s.mmsi && (
+                                    <>
+                                        <span className="text-gray-500">MMSI:</span>
+                                        <span>{s.mmsi}</span>
+                                    </>
+                                )}
+                            </div>
+                            <div className="mt-2 pt-1 border-t text-center">
+                                <a
+                                    href={`https://www.marinetraffic.com/en/ais/details/ships/imo:${s.imo}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-500 hover:underline text-xs"
+                                >
+                                    📊 View on MarineTraffic
+                                </a>
+                            </div>
+                        </div>
+                    </Popup>
                 </Marker>
             ))}
 

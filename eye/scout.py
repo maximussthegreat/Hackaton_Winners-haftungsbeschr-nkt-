@@ -26,29 +26,50 @@ class ScoutService:
         """
         ships = []
         
+        # Targets from proven test script
+        targets = [
+            {
+                "name": "MyShipTracking (Hamburg Arrivals)",
+                "url": "https://www.myshiptracking.com/ports-arrivals-departures/?pid=364",
+                "selector": "td"
+            },
+            {
+                "name": "VesselFinder (Hamburg Region)",
+                "url": "https://www.vesselfinder.com/vessels?bbox=9.789,53.456,10.057,53.593", # BBox for Hamburg
+                "selector": ".ship-link"
+            }
+        ]
+
         # 1. ATTEMPT SCRAPE (Best Effort)
-        try:
-            logger.info("SCOUT: Scanning Maritime Traffic Feeds...")
-            # We try a search for "Hamburg" on a vessel tracker
-            async with httpx.AsyncClient() as client:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-                } 
-                # Attempt 1: VesselFinder Region Search (Reverse Engineered)
-                resp = await client.get(self.sources[0], headers=headers, timeout=5.0)
-                
-                if resp.status_code == 200:
-                    soup = BeautifulSoup(resp.text, 'html.parser')
-                    # Look for table rows with ship looking names
-                    rows = soup.find_all("td")
-                    for r in rows:
-                        text = r.get_text(strip=True)
-                        # Heuristic: Uppercase 4-20 chars, no weird symbols
-                        if text.isupper() and len(text) > 4 and len(text) < 25 and not any(x in text for x in ["ARRIVAL", "DEPARTURE", "TIME", "DATE"]):
-                             ships.append(text)
-                             
-        except Exception as e:
-            logger.warning(f"SCOUT: Radar Jammed: {e}")
+        logger.info("SCOUT: Scanning Maritime Traffic Feeds...")
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        } 
+        
+        for t in targets:
+            try:
+                # logger.info(f"SCOUT: Pinging {t['name']}...")
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(t['url'], headers=headers, follow_redirects=True, timeout=8.0)
+                    
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, 'html.parser')
+                        
+                        if "myshiptracking" in t['url']:
+                            rows = soup.find_all("td")
+                            for r in rows:
+                                text = r.get_text(strip=True)
+                                # Heuristic: Uppercase 4-25 chars, no weird symbols
+                                if text.isupper() and len(text) > 3 and len(text) < 25 and not any(x in text for x in ["ARRIVAL", "DEPARTURE", "TIME", "DATE"]):
+                                     ships.append(text)
+                        
+                        elif "vesselfinder" in t['url']:
+                            links = soup.select(".ship-link")
+                            for l in links:
+                                ships.append(l.get_text(strip=True))
+
+            except Exception as e:
+                logger.warning(f"SCOUT: Radar Jammed on {t['name']}: {e}")
 
         # 2. VALIDATION & GEOLOCATION (OpenAI Fallback)
         source = "REAL_AIS_NET"
@@ -57,16 +78,19 @@ class ScoutService:
         
         if not ships:
             logger.info("SCOUT: Live Radar Blind. Engaging Generative Reconstruction (GPT-4o).")
+            # Only call OpenAI if we truly failed to find anything
             ships = self._generate_probable_manifest()
             source = "AI_INFERRED_ARCHIVE"
+        else:
+            logger.info(f"SCOUT: Visual Confirmation on {len(ships)} vessels.")
             
         # 3. CONVERT TO OBJECTS
         results = []
-        for name in ships[:8]: # Limit to 8 active vessels
+        for name in ships[:15]: # Limit increased to 15
             lat, lng = geography.get_safe_water_point(seed=name)
             results.append({
                 "id": name.upper().replace(" ", "-"),
-                "name": f"{name} [{source}]", 
+                "name": f"{name} [{source}]" if source == "AI_INFERRED_ARCHIVE" else name, 
                 "lat": lat,
                 "lng": lng,
                 "type": "Cargo Vessel", # Simulating Type if unknown
