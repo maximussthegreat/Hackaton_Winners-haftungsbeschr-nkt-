@@ -182,7 +182,6 @@ def trigger_simulation():
     logger.warning("SIMULATION STARTED: Sensor Failure at Rethe Bridge")
     current_state["simulation_active"] = True
     
-    # Calculate mock savings
     # Calculate mock savings using Real Economics Engine
     # answering "Real Data" promise: Use actual visible trucks if any
     
@@ -194,12 +193,9 @@ def trigger_simulation():
     current_state["trucks_rerouted"] = affected_trucks
     
     # Calculate risk
-    # Calculate risk
     # Dynamic Weather Risk from recent state
     w_cond = current_state["visual_truth"].get("weather", {}).get("condition", "CLEAR")
     risk = risk_engine.calculate_risk(blocked_nodes=["rethe_bridge"], weather_condition=w_cond) * 100
-    
-    # Generate speech
     
     # Generate speech
     speech = {"text": "Simulation Active. Rerouting traffic.", "audio": None} # voice_agent.generate_climax_speech(savings)

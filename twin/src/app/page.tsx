@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import SystemConsole from '@/components/SystemConsole';
+import RiskInterventionModal from '@/components/RiskInterventionModal';
 
 // Dynamic import to avoid SSR issues with Leaflet
 const TwinMap = dynamic(() => import('@/components/TwinMap'), {
@@ -55,7 +56,6 @@ export default function Home() {
   const [simObstacles, setSimObstacles] = useState<string[]>([]);
 
   const [showRadar, setShowRadar] = useState<boolean>(true); // Radar Toggle
-
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeLabel, setCurrentTimeLabel] = useState("LIVE");
   const [tideLevel, setTideLevel] = useState(0);
@@ -64,6 +64,12 @@ export default function Home() {
   // Future Prediction State
   const [futureData, setFutureData] = useState<any>(null);
   const [showFuture, setShowFuture] = useState(false);
+
+  // --- CRISIS SCENARIO STATE ---
+  const [showRiskModal, setShowRiskModal] = useState(false);
+  const [hasTriggeredCrisis, setHasTriggeredCrisis] = useState(false); // T+5 (Traffic)
+  const [hasTriggeredIce, setHasTriggeredIce] = useState(false);       // T+11 (Ice)
+  const [crisisType, setCrisisType] = useState<"TRAFFIC" | "ICE">("TRAFFIC");
 
   // --- AUTOPLAY LOOP ---
   useEffect(() => {
@@ -74,7 +80,28 @@ export default function Home() {
           // Speed: 0.1h per tick (6 mins)
           const nextVal = prev + 0.1;
 
-          // Loop: -12 -> +12
+          // --- SEQUENTIAL ANOMALY DETECTION (CRISIS LOGIC) ---
+          // The system monitors future time-horizons for probability cascades.
+          // Event 1: Unscheduled Convoy Accumulation (Traffic Risk)
+          if (nextVal >= 5.0 && nextVal < 5.2 && !hasTriggeredCrisis) {
+            setIsPlaying(false);
+            setHasTriggeredCrisis(true);
+            setCrisisType("TRAFFIC"); // Trigger: MSC PREZIOSA Convoy
+            setShowRiskModal(true);
+            return nextVal;
+          }
+
+          // Event 2: Environmental Deterministic Lock (Weather Risk)
+          // Flash Freeze combined with Tidal Low creates "Hydraulic Lock" probability
+          if (nextVal >= 11.0 && nextVal < 11.2 && !hasTriggeredIce) {
+            setIsPlaying(false);
+            setHasTriggeredIce(true);
+            setCrisisType("ICE"); // Trigger: CMA CGM ANTOINE Delay
+            setShowRiskModal(true);
+            return nextVal;
+          }
+
+          // Loop: -12 -> +12 (Continuous 24h Rolling Window)
           if (nextVal > 12) {
             return -12; // Loop back to start of history
           }
@@ -83,7 +110,28 @@ export default function Home() {
       }, 100);
     }
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [isPlaying, hasTriggeredCrisis, hasTriggeredIce]);
+
+  // Handle Crisis Actions
+  const handleCrisisAction = (action: string) => {
+    console.log(`User took action: ${action}`);
+    setShowRiskModal(false);
+
+    if (action.includes("DISPATCH")) {
+      // ELEVEN LABS SCRIPT
+      setAlert("🎙️ DISPATCH: 'ATTENTION ALL UNITS. ICE WARNING SECTOR 4. REROUTE VIA A7. ACKNOWLEDGE.'");
+    } else if (action.includes("MOBILITHEK")) {
+      setAlert("DATA SENT: T-STRATEGY-2026-ICE UPDATE PUSHED TO CLOUD.");
+    } else {
+      setAlert(`ACTION CONFIRMED: ${action}`);
+    }
+
+    // Clear alert after a few seconds and resume
+    setTimeout(() => {
+      setAlert(null);
+      setIsPlaying(true);
+    }, 6000); // Longer read time for script
+  };
 
   // Notify AI during playback (every 5 slider steps)
   useEffect(() => {
@@ -133,14 +181,13 @@ export default function Home() {
           setHistoryData(hData);
         }
 
-        if (serverState.simulation_active && !alert) {
+        if (serverState.simulation_active && !alert && !showRiskModal) {
           setAlert("CRITICAL OVERRIDE: SENSOR ANOMALY DETECTED");
           setMetrics(serverState.savings);
           setRiskLevel(0.8);
           // ... Voice trigger logic ...
         }
 
-        // Live Mode Weather Sync (Slider at 0)
         if (Math.abs(sliderValue) < 0.1 && serverState.visual_truth?.weather) {
           setSimWeather(serverState.visual_truth.weather.condition);
         }
@@ -150,7 +197,7 @@ export default function Home() {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [alert, historyData, sliderValue]);
+  }, [alert, historyData, sliderValue, showRiskModal]);
 
   // Effect: Calculate ships and environment based on Slider (Unified Mirror Logic)
   useEffect(() => {
@@ -162,7 +209,6 @@ export default function Home() {
       return;
     }
 
-    // Ensure we have history data to mirror
     if (!historyData) return;
 
     const isFuture = sliderValue > 0;
@@ -170,47 +216,30 @@ export default function Home() {
 
     const start = historyData.window_start;
     const end = historyData.window_end;
-
-    // Calculate Verification Time (The time we are "looking at")
     const displayTimestamp = end + (sliderValue * 3600);
     const displayDate = new Date(displayTimestamp * 1000);
-
     const label = displayDate.toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit' });
     setCurrentTimeLabel(isFuture ? `${label} (PREDICTION)` : label);
 
     // --- CONTINUOUS SHIFT STRATEGY ---
-    // User Requirement: 12h Past + 12h Future, smooth transition.
-    // We map the 24h Data Window [End-24h, End] to the Slider Window [-12h, +12h].
-    // Slider = -12 -> Source = End - 24h
-    // Slider = 0   -> Source = End - 12h
-    // Slider = +12 -> Source = End
-
-    // 1. Calculate the Source Time from the History Data
+    // Mirror past 24h into Future (-12h to +12h)
     let sourceTimestamp = end - (12 * 3600) + (sliderValue * 3600);
-
-    // Safety Clamp
     if (sourceTimestamp < start) sourceTimestamp = start;
     if (sourceTimestamp > end) sourceTimestamp = end;
 
-    // Render Ships from Source Time
     const currentFrameShips: Ship[] = [];
 
     historyData.ships.forEach((hShip: any) => {
       const path = hShip.path;
       if (!path || path.length < 2) return;
-
-      // Check bounds
       if (sourceTimestamp < path[0].ts || sourceTimestamp > path[path.length - 1].ts) return;
 
-      // Interpolate
       for (let i = 0; i < path.length - 1; i++) {
         const p1 = path[i];
         const p2 = path[i + 1];
         if (sourceTimestamp >= p1.ts && sourceTimestamp <= p2.ts) {
           const r = (sourceTimestamp - p1.ts) / (p2.ts - p1.ts);
-
           const shipId = isFuture ? `PRED-${hShip.id}` : hShip.id;
-
           currentFrameShips.push({
             id: shipId,
             type: hShip.type,
@@ -225,9 +254,8 @@ export default function Home() {
     });
 
     // --- GUARANTEED VISUALS (FUTURE) ---
-    // Ensure the user always sees something moving in prediction mode
     if (isFuture) {
-      // Hackathon Express (Always Moving)
+      // 1. Hackathon Express (Always Moving)
       const prog = (Math.abs(sliderValue) % 12) / 12.0;
       currentFrameShips.push({
         id: "FUTURE-HACKATHON-EXPRESS",
@@ -237,7 +265,7 @@ export default function Home() {
         status: "PREDICTED_UNDERWAY",
         imo: "FUTURE-AI"
       });
-      // Ever Century (Static Anchor)
+      // 2. Ever Century (Static Anchor)
       currentFrameShips.push({
         id: "FUTURE-EVER-CENTURY",
         type: "Container Ship",
@@ -246,6 +274,77 @@ export default function Home() {
         status: "PREDICTED_MOORED",
         imo: "FUTURE-AI"
       });
+
+      // 3. --- CRISIS SCENARIO V3 (HIGH RESOLUTION PATH) ---
+      // Defined: Waltershof -> Köhlbrand -> Rethe -> All the way to Kattwyk
+      // 6 Points to force the curve
+      const KATTWYK_PATH = [
+        { lat: 53.5300, lng: 9.9100 }, // 0: Waltershof Hub
+        { lat: 53.5250, lng: 9.9250 }, // 1: Entering Köhlbrand
+        { lat: 53.5180, lng: 9.9350 }, // 2: Bridge Approach N
+        { lat: 53.5120, lng: 9.9380 }, // 3: Under Bridge
+        { lat: 53.5000, lng: 9.9480 }, // 4: Past Rethe Junc
+        { lat: 53.4940, lng: 9.9520 }  // 5: Kattwyk Alert Zone
+      ];
+
+      // Multi-Point Interpolation Helper
+      const interpolatePath = (path: { lat: number, lng: number }[], p: number) => {
+        if (p <= 0) return path[0];
+        if (p >= 1) return path[path.length - 1];
+
+        const totalSegments = path.length - 1;
+        const segmentP = p * totalSegments;
+        const idx = Math.floor(segmentP);
+        const t = segmentP - idx;
+
+        const p1 = path[idx];
+        const p2 = path[idx + 1] || path[idx]; // Safety
+
+        return {
+          lat: p1.lat + (p2.lat - p1.lat) * t,
+          lng: p1.lng + (p2.lng - p1.lng) * t
+        }
+      };
+
+      // SHIP A: Arrives T+5.0 (Travels T+3.0 to T+5.0)
+      if (sliderValue > 3.0 && sliderValue < 5.0) {
+        const p = (sliderValue - 3.0) / 2.0; // 0 to 1 over 2h
+        const pos = interpolatePath(KATTWYK_PATH, p);
+        currentFrameShips.push({
+          id: "MSC PREZIOSA",
+          type: "Ultra-Large Container",
+          lat: pos.lat,
+          lng: pos.lng,
+          status: "CRITICAL_PATH",
+          imo: "9639206"
+        });
+      }
+      // Hold Ship A at the bridge for a bit just in case (T+5.0 to T+5.5)
+      else if (sliderValue >= 5.0 && sliderValue < 5.5) {
+        const pos = KATTWYK_PATH[KATTWYK_PATH.length - 1];
+        currentFrameShips.push({
+          id: "MSC PREZIOSA",
+          type: "Ultra-Large Container",
+          lat: pos.lat,
+          lng: pos.lng,
+          status: "AWAITING_INSTRUCTION",
+          imo: "9639206"
+        });
+      }
+
+      // SHIP B: Arrives T+11.0 (Travels T+9.0 to T+11.0)
+      if (sliderValue > 9.0 && sliderValue < 11.0) {
+        const p = (sliderValue - 9.0) / 2.0;
+        const pos = interpolatePath(KATTWYK_PATH, p);
+        currentFrameShips.push({
+          id: "CMA CGM ANTOINE",
+          type: "Heavy Load Carrier",
+          lat: pos.lat,
+          lng: pos.lng,
+          status: "CRITICAL_PATH",
+          imo: "9706308"
+        });
+      }
     }
 
     setPlaybackShips(currentFrameShips);
@@ -265,7 +364,7 @@ export default function Home() {
   }, [sliderValue, historyData, state]);
 
   // Determine Data Source for UI
-  const isHistory = sliderValue < 0 || sliderValue > 0; // Future is treated as Sim Mode visually
+  const isHistory = sliderValue < 0 || sliderValue > 0;
 
   // Traffic Simulation Logic (Visuals)
   let simIncidents: string[] = [];
@@ -280,7 +379,54 @@ export default function Home() {
 
   return (
     <main className="relative w-screen h-screen bg-black overflow-hidden select-none">
-      {/* Weather handled inside TwinMap now */}
+
+      {/* INTELLIGENCE LAYER: WEBCAMS */}
+      {/* Teufelsbrück (Elbe Entrance) */}
+      <a
+        href="https://www.portofhamburg.com/en/webcam-teufelsbrueck/"
+        target="_blank"
+        className="absolute top-[65%] left-[10%] z-20 group"
+      >
+        <div className="bg-black/80 border border-green-500/50 p-1 rounded-full hover:scale-110 transition-transform cursor-pointer">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+        </div>
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black text-[10px] text-green-400 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none border border-green-900">
+          CAM: TEUFELSBRÜCK
+        </div>
+      </a>
+
+      {/* Bubendey-Ufer (Elbe Pilot Station) */}
+      <a
+        href="https://www.youtube.com/results?search_query=hamburg+hafen+live"
+        target="_blank"
+        className="absolute top-[55%] left-[25%] z-20 group"
+      >
+        <div className="bg-black/80 border border-green-500/50 p-1 rounded-full hover:scale-110 transition-transform cursor-pointer">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+        </div>
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black text-[10px] text-green-400 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none border border-green-900">
+          CAM: BUBENDEY
+        </div>
+      </a>
+
+      {/* Neuhof (Sector 4 Crisis Zone) */}
+      <div className="absolute top-[35%] right-[30%] z-20 group">
+        <div className="bg-black/80 border border-red-500 p-1.5 rounded-full hover:scale-110 transition-transform cursor-pointer animate-pulse">
+          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+        </div>
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black text-[10px] text-red-500 font-bold px-2 py-0.5 rounded opacity-100 whitespace-nowrap border border-red-900">
+          CAM: SECTOR 4 (ACTIVE)
+        </div>
+      </div>
+
+      {/* MODAL OVERLAY (Crisis) */}
+      {showRiskModal && (
+        <RiskInterventionModal
+          onClose={() => setShowRiskModal(false)}
+          onAction={handleCrisisAction}
+          scenario={crisisType}
+        />
+      )}
 
       {/* HUD Layer */}
       <div className="absolute top-0 left-0 w-full z-10 p-6 pointer-events-none flex justify-between items-start">
@@ -387,6 +533,7 @@ export default function Home() {
               onChange={(e) => {
                 setSliderValue(parseFloat(e.target.value));
                 setIsPlaying(false);
+                setHasTriggeredCrisis(false); // Reset trigger on manual seek
               }}
               className="w-full h-4 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 relative z-10"
               style={{
@@ -405,7 +552,7 @@ export default function Home() {
           </div>
 
           <button
-            onClick={() => { setSliderValue(0); setIsPlaying(false); }}
+            onClick={() => { setSliderValue(0); setIsPlaying(false); setHasTriggeredCrisis(false); setHasTriggeredIce(false); }}
             className="px-2 py-1 bg-red-900 hover:bg-red-700 rounded text-xs border border-red-500"
           >
             RST
@@ -422,8 +569,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Alert Overlay */}
-      {alert && (
+      {/* Alert Overlay (Hide if Modal is open) */}
+      {alert && !showRiskModal && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-pulse pointer-events-none">
           <div className="border-4 border-red-600 bg-red-900/90 text-white px-12 py-6 rounded-lg backdrop-blur-md shadow-[0_0_50px_rgba(255,0,0,0.5)]">
             <h2 className="text-3xl font-black">{alert}</h2>
