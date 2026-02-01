@@ -3,6 +3,7 @@ import httpx
 import os
 import random
 import json
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
@@ -30,9 +31,11 @@ from brain.cognition import LLMService
 llm_service = LLMService()
 # conflict_engine = ConflictEngine() # Deprecated
 economics_engine = EconomicsEngine()
-risk_engine = RiskEngine()
-sentinel_api = SentinelAPI()
 voice_agent = VoiceAgent()
+from brain.security import SecurityService
+security_service = SecurityService()
+from brain.weather import WeatherService
+weather_service = WeatherService()
 
 # State
 current_state = {
@@ -62,8 +65,10 @@ async def poll_eyes():
                 aggregated_ships = []
                 aggregated_trucks = []
                 tide_level = 0
-                weather_info = {"condition": "CLEAR"} # Default
+                # Fetch Real Weather
+                weather_info = await weather_service.get_current_weather() 
                 all_traffic_alerts = []
+                security_alerts = []
                 
                 for node in nodes:
                     resp = await client.get(f"http://127.0.0.1:8001/status?node_id={node}")
@@ -82,6 +87,12 @@ async def poll_eyes():
                         if "traffic_alerts" in data:
                             all_traffic_alerts.extend(data["traffic_alerts"])
 
+                # Check Security Force Feeds
+                sec_alert = security_service.check_alerts()
+                if sec_alert:
+                    security_alerts.append(sec_alert)
+                    add_log("SECURITY", f"[{sec_alert['source']}] {sec_alert['category']}: {sec_alert['text'][:50]}...")
+
                 # Update State for Cognition
                 current_state["visual_truth"] = {
                     "ships": aggregated_ships,
@@ -89,6 +100,7 @@ async def poll_eyes():
                     "tide": tide_level,
                     "weather": weather_info,
                     "traffic_alerts": list(set(all_traffic_alerts)), # Deduplicate
+                    "security_alerts": security_alerts,
                     "nodes": nodes
                 }
 
@@ -266,7 +278,15 @@ def get_vessel_info(identifier: str):
         return info
     raise HTTPException(status_code=404, detail=f"Vessel '{identifier}' not found")
 
+@app.get("/prediction/future")
+def get_future_prediction():
+    """
+    Returns a 24h probabilistic forecast.
+    """
+    # Generate on demand
+    history_data = historian.get_24h_history()
+    return predictive_engine.predict_24h_future(current_state, history_data)
+
 if __name__ == "__main__":
     logger.info("Starting The Brain...")
     uvicorn.run(app, host="0.0.0.0", port=8002)
-

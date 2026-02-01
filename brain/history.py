@@ -590,7 +590,6 @@ REAL_VESSELS = [
 # ============================================================================
 
 # Main Elbe channel
-ELBE_MAIN = [
     (53.8950, 8.6800),   # Elbe 1 buoy
     (53.8920, 8.7500),   # Scharhörn  
     (53.8850, 8.8500),   # Neuwerk
@@ -602,10 +601,14 @@ ELBE_MAIN = [
     (53.7200, 9.5000),   # Krautsand
     (53.6500, 9.6000),   # Stade approach
     (53.6000, 9.7500),   # Lühe
-    (53.5650, 9.8200),   # Blankenese curve
+    (53.5850, 9.7800),   # Wedel
+    (53.5650, 9.8000),   # Blankenese Bend Start
+    (53.5550, 9.8200),   # Blankenese Bend Mid
+    (53.5480, 9.8500),   # Teufelsbrück approach
     (53.5450, 9.8700),   # Finkenwerder
-    (53.5300, 9.9100),   # Waltershof junction
-]
+    (53.5420, 9.8900),   # Parkhafen Entry
+    (53.5350, 9.9000),   # Bubendey-Ufer
+    (53.5300, 9.9100),   # Waltershof junction (Main Hub)
 
 # Terminal approach branches (connected to Waltershof junction)
 TERMINAL_APPROACHES = {

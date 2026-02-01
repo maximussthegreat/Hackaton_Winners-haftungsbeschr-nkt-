@@ -44,3 +44,38 @@ a {
     color-scheme: dark;
   }
 }
+
+/* Leaflet Custom Styles */
+.traffic-line-glow {
+  filter: drop-shadow(0 0 8px);
+  /* Inherits color from stroke */
+  animation: pulse-traffic 2s infinite;
+}
+
+@keyframes pulse-traffic {
+  0% {
+    opacity: 0.6;
+    stroke-width: 8;
+  }
+
+  50% {
+    opacity: 1.0;
+    stroke-width: 10;
+  }
+
+  100% {
+    opacity: 0.6;
+    stroke-width: 8;
+  }
+}
+
+.traffic-pulse {
+  animation: pulse-traffic 2s infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* DARK MODE MAP HACK */
+.leaflet-layer {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
