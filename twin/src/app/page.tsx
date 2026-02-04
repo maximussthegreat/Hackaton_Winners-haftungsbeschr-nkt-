@@ -77,13 +77,21 @@ export default function Home() {
     if (isPlaying) {
       interval = setInterval(() => {
         setSliderValue((prev) => {
-          // Speed: 0.1h per tick (6 mins)
-          const nextVal = prev + 0.1;
+          // --- CINEMATIC SPEED CONTROL ---
+          // Base Speed: 0.05h per tick (3 mins) -> 2X Slower than original
+          let speed = 0.05;
+
+          // Matrix Mode (Crisis Windows): 4X Slower than Base -> 0.0125
+          if ((prev >= 4.5 && prev <= 7.0) || (prev >= 10.5 && prev <= 12.0)) {
+            speed = 0.01; // Ultra Slow Motion for Detail
+          }
+
+          const nextVal = prev + speed;
 
           // --- SEQUENTIAL ANOMALY DETECTION (CRISIS LOGIC) ---
           // The system monitors future time-horizons for probability cascades.
           // Event 1: Unscheduled Convoy Accumulation (Traffic Risk)
-          if (nextVal >= 5.0 && nextVal < 5.2 && !hasTriggeredCrisis) {
+          if (nextVal >= 5.0 && nextVal < 5.02 && !hasTriggeredCrisis) {
             setIsPlaying(false);
             setHasTriggeredCrisis(true);
             setCrisisType("TRAFFIC"); // Trigger: MSC PREZIOSA Convoy
@@ -93,7 +101,7 @@ export default function Home() {
 
           // Event 2: Environmental Deterministic Lock (Weather Risk)
           // Flash Freeze combined with Tidal Low creates "Hydraulic Lock" probability
-          if (nextVal >= 11.0 && nextVal < 11.2 && !hasTriggeredIce) {
+          if (nextVal >= 11.0 && nextVal < 11.02 && !hasTriggeredIce) {
             setIsPlaying(false);
             setHasTriggeredIce(true);
             setCrisisType("ICE"); // Trigger: CMA CGM ANTOINE Delay
@@ -409,15 +417,7 @@ export default function Home() {
         </div>
       </a>
 
-      {/* Neuhof (Sector 4 Crisis Zone) */}
-      <div className="absolute top-[35%] right-[30%] z-20 group">
-        <div className="bg-black/80 border border-red-500 p-1.5 rounded-full hover:scale-110 transition-transform cursor-pointer animate-pulse">
-          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-        </div>
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black text-[10px] text-red-500 font-bold px-2 py-0.5 rounded opacity-100 whitespace-nowrap border border-red-900">
-          CAM: SECTOR 4 (ACTIVE)
-        </div>
-      </div>
+
 
       {/* MODAL OVERLAY (Crisis) */}
       {showRiskModal && (

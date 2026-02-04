@@ -1,3 +1,4 @@
+import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -98,6 +99,30 @@ interface TwinMapProps {
     simWeather?: string; // CLEAR, RAIN, SNOW
 }
 
+// --- ROBUST TILE LAYER FIX (Bypassing React-Leaflet Component Bug) ---
+import { useMap } from 'react-leaflet';
+
+const StableTileLayer = ({ url, attribution, opacity = 1 }: { url: string, attribution?: string, opacity?: number }) => {
+    const map = useMap();
+
+    React.useEffect(() => {
+        if (!map) return;
+
+        const layer = L.tileLayer(url, {
+            attribution,
+            opacity: opacity
+        });
+
+        layer.addTo(map);
+
+        return () => {
+            map.removeLayer(layer);
+        };
+    }, [map, url, attribution, opacity]);
+
+    return null;
+};
+
 export default function TwinMap({
     riskLevel,
     alert,
@@ -124,10 +149,7 @@ export default function TwinMap({
     const tomtomTrafficFlow = `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`;
 
     // Dynamic Traffic Color Logic
-    // bridge_open = Bridge is UP (Traffic Stopped) -> RED
-    // bridge_closed = Bridge is DOWN (Traffic Flowing) -> GREEN
     const trafficColor = bridgeStatus === 'bridge_open' ? '#ff0000' : '#44ff00';
-    // const trafficGlow = bridgeStatus === 'bridge_open' ? '0 0 10px #ff0000' : '0 0 5px #00ff00'; // Unused in pathOptions, kept for concept
 
     return (
         <MapContainer
@@ -138,14 +160,13 @@ export default function TwinMap({
             attributionControl={false}
         >
             {/* Base Map: CartoDB Voyager - ALWAYS visible */}
-            <TileLayer
+            <StableTileLayer
                 attribution='&copy; OpenStreetMap &copy; CARTO'
                 url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
 
-
             {/* TomTom Traffic - Structure Overlay (Static) */}
-            <TileLayer
+            <StableTileLayer
                 url={tomtomTrafficFlow}
                 opacity={0.8}
             />

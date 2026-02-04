@@ -156,6 +156,5 @@ export default function RiskInterventionModal({ onClose, onAction, scenario }: R
             </div>
 
         </div>
-    </div >
     );
 }

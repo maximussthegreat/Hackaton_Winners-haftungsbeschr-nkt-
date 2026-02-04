@@ -1,66 +1,76 @@
-# SENTINEL: The All-Seeing Port Brain
+# 🦅 PROJECT SENTINEL
 
-> **Grand Prize Architecture & Strategic Execution Plan**
+**The All-Seeing Port Brain (Digital Twin & AI Prediction Engine)**
 
-![Sentinel Vision](https://via.placeholder.com/800x400?text=SENTINEL:+The+All-Seeing+Port+Brain)
+Sentinel is an AI-powered Digital Twin for the Port of Hamburg, designed to predict traffic gridlocks, bridge closures, and safety incidents up to 24h in advance using a Hybrid Twin architecture (Real-time Data + Physics Simulation).
 
-## Executive Summary
+![Sentinel](https://cdn.openai.com/labs/images/sentinel-port-twin.png)
 
-The **SENTINEL** platform represents a fundamental paradigm shift from passive monitoring to active, agentic verification. By integrating the **'Eye of Hamburg'** (computer vision), **'The Brain'** (conflict resolution & risk modeling), and **'The Twin'** (3D holographic interaction), SENTINEL verifies physical reality against digital metadata to optimize the Port of Hamburg in real-time.
-
-## Architecture: The Cyber-Physical Panopticon
-
-### 1. The Eye (Perception Layer)
-
-- **Path**: `/eye`
-- **Tech**: Python, YOLOv8, OpenCV, Selenium
-- **Function**: Visual scraping of HPA webcams, Optical Flow analysis, Bridge state classification. Verifies "Ground Truth".
-
-### 2. The Brain (Cognition Layer)
-
-- **Path**: `/brain`
-- **Tech**: Python, FastAPI, Epydemix (Bio-Risk), Scikit-Learn
-- **Function**: Conflict Engine (API vs. Visual), Economic Ticker (Carbon/Fuel Savings), Congestion Modeling.
-
-### 3. The Twin (Interaction Layer)
-
-- **Path**: `/twin`
-- **Tech**: Next.js, React Three Fiber, Three.js, WebGL
-- **Function**: Volumetric 3D visualization, Bio-Risk fog overlay, Real-time vessel tracking.
-
-## Getting Started
+## 🚀 HOW TO RUN (ANY MACHINE)
 
 ### Prerequisites
 
-- Node.js 18+
-- Python 3.9+
+* Node.js (v18+)
+* Python (3.9+)
+* A modern GPU-enabled browser (for 4K Digital Twin render)
 
-### Installation
+### 1. Clone & Setup
 
-1. **Clone the repo**
+```bash
+git clone https://github.com/maximussthegreat/Hackaton_Winners-haftungsbeschr-nkt-.git
+cd Hackaton_Winners-haftungsbeschr-nkt-
+```
 
-   ```bash
-   git clone https://github.com/maximussthegreat/Hackaton_Winners-haftungsbeschr-nkt-.git
-   cd Hackaton_Winners-haftungsbeschr-nkt-
-   ```
+### 2. Start the Twin (Frontend)
 
-2. **Setup The Twin (Frontend)**
+This launches the Holographic Interface.
 
-   ```bash
-   cd twin
-   npm install
-   npm run dev
-   ```
+```bash
+cd twin
+npm install
+npm run dev
+```
 
-3. **Setup The Eye & Brain (Backend)**
+> Open `http://localhost:3000`
 
-   ```bash
-   # From root
-   python -m venv venv
-   .\venv\Scripts\Activate
-   pip install -r requirements.txt
-   ```
+### 3. Start the Brain (Backend/AI)
 
-## Key Commands
+This launches the Python reasoning engine (Traffic, Weather, Predictions).
 
-- **Antigravity, simulate sensor failure**: Triggers the main demo loop.
+```bash
+# In a new terminal (root folder)
+pip install -r requirements.txt
+python -m brain.main
+```
+
+---
+
+## 🎮 DEMO CONTROLS
+
+### **1. 48h Time Slider**
+
+* **Center Red Line**: LIVE Real-time view.
+* **Left (-12h)**: Replay historical ship movements (Ghost Ships).
+* **Right (+12h)**: AI Looking Glass (Future Predictions).
+
+### **2. The "Matrix Mode" (Cinematic)**
+
+* Drag slider to **T+5.0h** or **T+11.0h**.
+* System creates a "Slow-Mo" Matrix effect (2X -> 5X slowdown).
+* Watch "MSC PREZIOSA" or "CMA CGM ANTOINE" navigate the bridge.
+* **Modal Trigger**: A Red Crisis Alert will pop up automatically.
+
+### **3. Intelligence Layer (Webcams)**
+
+* Click Green dots on map (Teufelsbrück/Bubendey) to open real-time feeds.
+* Click "TRACK VESSEL" in Crisis Modal to verify ship existence (MarineTraffic).
+
+---
+
+## 🧠 ARCHITECTURE
+
+* **Frontend**: Next.js 14, Tailwind, React-Leaflet (Holographic Mode).
+* **Backend**: Python, OpenAI API, NINA API, Port Hamburg Data.
+* **Truth Engine**: Validates all predictions against Physics & Tidal constraints.
+
+*Built for Hamburg Port Hackathon 2026.*
